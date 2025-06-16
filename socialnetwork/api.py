@@ -296,4 +296,36 @@ def similar_users(user: SocialNetworkUsers):
     #########################
     # add your code here
     #########################
+    
+    user_fames = Fame.objects.filter(user=user)
+    user_expertise_areas = list(user_fames.values_list('expertise_area', flat=True))
+    user_fame_dict = {f.expertise_area_id: f.fame_level.numeric_value for f in user_fames.select_related('fame_level')}
+    n_areas = len(user_expertise_areas)
+    if n_areas == 0:
+        return FameUsers.objects.none()
+
+    results = []
+    other_users = FameUsers.objects.exclude(id=user.id)
+    for other in other_users:
+        similar_count = 0
+        for area_id in user_expertise_areas:
+            try:
+                other_fame = Fame.objects.get(user=other, expertise_area_id=area_id).fame_level.numeric_value
+            except Fame.DoesNotExist:
+                other_fame = float('inf')
+            if abs(user_fame_dict[area_id] - other_fame) <= 100:
+                similar_count += 1
+        similarity = similar_count / n_areas
+        if similarity > 0:
+            results.append((other, similarity))
+    results.sort(key=lambda tup: (-tup[1], -tup[0].date_joined.timestamp()))
+    user_ids = [u.id for u, _ in results]
+    similarity_map = {u.id: sim for u, sim in results}
+    qs = FameUsers.objects.filter(id__in=user_ids).annotate(
+        similarity=Case(
+            *[When(id=uid, then=Value(sim)) for uid, sim in similarity_map.items()],
+            output_field=FloatField()
+        )
+    ).order_by('-similarity', '-date_joined')
+    return qs
 
