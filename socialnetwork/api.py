@@ -247,21 +247,23 @@ def join_community(user: SocialNetworkUsers, community: ExpertiseAreas):
     #########################
     # add your code here
     #########################
-    if community in user.communities.all():
-        return {"joined": False}
-    user.communities.add(community)
-    user.save()
-    return {"joined": True}
+    pass
+    # if community in user.communities.all():
+    #     return {"joined": False}
+    # user.communities.add(community)
+    # user.save()
+    # return {"joined": True}
 
 
 
 def leave_community(user: SocialNetworkUsers, community: ExpertiseAreas):
     """Leave a specified community."""
-    if community not in user.communities.all():
-        return {"left": False}
-    user.communities.remove(community)
-    user.save()
-    return {"left": True}
+    pass
+    # if community not in user.communities.all():
+    #     return {"left": False}
+    # user.communities.remove(community)
+    # user.save()
+    # return {"left": True}
 
 
 

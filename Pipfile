@@ -4,11 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "*"
 djangorestframework = "*"
 faker = "*"
 termcolor = "*"
 regex = "*"
+django = "*"
 
 [dev-packages]
 
