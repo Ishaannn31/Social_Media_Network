@@ -28,11 +28,24 @@ def timeline(user: SocialNetworkUsers, start: int = 0, end: int = None, publishe
         # 3. the post contains the community’s expertise area
         # 4. the post is published or the user is the author
 
-        pass
+        
         #########################
         # add your code here
         #########################
+        user_communities = set(user.communities.all())
+        posts = Posts.objects.filter(
+            (Q(published=published) | Q(author=user)),
+            expertise_area_and_truth_ratings__in=user_communities
+        ).distinct().order_by("-submitted")
 
+        filtered_ids = []
+        for post in posts:
+            post_expertise_areas = set(post.expertise_area_and_truth_ratings.all())
+            author_communities = set(post.author.communities.all())
+            shared_areas = user_communities & author_communities & post_expertise_areas
+            if shared_areas:
+                filtered_ids.append(post.id)
+        posts = Posts.objects.filter(id__in=filtered_ids).order_by("-submitted")
     else:
         # in standard mode, posts of followed users are displayed
         _follows = user.follows.all()
@@ -153,6 +166,14 @@ def submit_post(
             except Fame.DoesNotExist:
                 confuser_level, _ = FameLevels.objects.get_or_create(name="Confuser", numeric_value=-10)
                 Fame.objects.create(user=user, expertise_area=expertise_area, fame_level=confuser_level)
+        try:
+            fame = Fame.objects.get(user=user, expertise_area=expertise_area)
+            super_pro_level = FameLevels.objects.get(name="Super Pro")
+            if fame.fame_level.numeric_value < super_pro_level.numeric_value:
+                user.communities.remove(expertise_area)
+        except (Fame.DoesNotExist, FameLevels.DoesNotExist):
+            pass
+
 
 
        
@@ -247,23 +268,23 @@ def join_community(user: SocialNetworkUsers, community: ExpertiseAreas):
     #########################
     # add your code here
     #########################
-    pass
-    # if community in user.communities.all():
-    #     return {"joined": False}
-    # user.communities.add(community)
-    # user.save()
-    # return {"joined": True}
+   
+    if community in user.communities.all():
+        return {"joined": False}
+    user.communities.add(community)
+    user.save()
+    return {"joined": True}
 
 
 
 def leave_community(user: SocialNetworkUsers, community: ExpertiseAreas):
     """Leave a specified community."""
-    pass
-    # if community not in user.communities.all():
-    #     return {"left": False}
-    # user.communities.remove(community)
-    # user.save()
-    # return {"left": True}
+   
+    if community not in user.communities.all():
+        return {"left": False}
+    user.communities.remove(community)
+    user.save()
+    return {"left": True}
 
 
 
