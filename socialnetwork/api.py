@@ -151,6 +151,7 @@ def submit_post(
         
         truth_rating = area.get("truth_rating")    
         if truth_rating and truth_rating.numeric_value < 0:
+            
             try:
                 u = Fame.objects.get(user=user, expertise_area=expertise_area)
                 old_fame = u.fame_level
@@ -166,6 +167,7 @@ def submit_post(
             except Fame.DoesNotExist:
                 confuser_level, _ = FameLevels.objects.get_or_create(name="Confuser", numeric_value=-10)
                 Fame.objects.create(user=user, expertise_area=expertise_area, fame_level=confuser_level)
+
         try:
             fame = Fame.objects.get(user=user, expertise_area=expertise_area)
             super_pro_level = FameLevels.objects.get(name="Super Pro")
@@ -173,18 +175,6 @@ def submit_post(
                 user.communities.remove(expertise_area)
         except (Fame.DoesNotExist, FameLevels.DoesNotExist):
             pass
-
-
-
-       
-            
-            
-
-            
-
-    
-        
-
 
     post.save()
 
@@ -249,9 +239,7 @@ def bullshitters():
     #########################
     result = {}
     for area in ExpertiseAreas.objects.all():
-        users = area.fame_set.filter(
-            fame_level__numeric_value__lt=0
-        ).order_by("fame_level__numeric_value", "-user__date_joined")
+        users = Fame.objects.filter(expertise_area=area, fame_level__numeric_value__lt=0).order_by("fame_level__numeric_value", "-user__date_joined")
         if users.exists():
             result[area] = [
                 {"user": u.user, "fame_level_numeric": u.fame_level.numeric_value}
@@ -299,8 +287,12 @@ def similar_users(user: SocialNetworkUsers):
     
     user_fames = Fame.objects.filter(user=user)
     user_expertise_areas = list(user_fames.values_list('expertise_area', flat=True))
-    user_fame_dict = {f.expertise_area_id: f.fame_level.numeric_value for f in user_fames.select_related('fame_level')}
+
+    user_fame_dict = {}
+    for fame in user_fames.select_related('fame_level'):
+        user_fame_dict[fame.expertise_area_id] = fame.fame_level.numeric_value
     n_areas = len(user_expertise_areas)
+
     if n_areas == 0:
         return FameUsers.objects.none()
 
@@ -319,13 +311,29 @@ def similar_users(user: SocialNetworkUsers):
         if similarity > 0:
             results.append((other, similarity))
     results.sort(key=lambda tup: (-tup[1], -tup[0].date_joined.timestamp()))
-    user_ids = [u.id for u, _ in results]
-    similarity_map = {u.id: sim for u, sim in results}
-    qs = FameUsers.objects.filter(id__in=user_ids).annotate(
+
+    user_ids = []
+    for user_info in results:
+        user_ids.append(user_info[0].id)
+
+    similarity_map = {}
+    for user, score in results:
+        similarity_map[user.id] = score
+
+    similarity_cases = []
+    for user_id, score in similarity_map.items():
+        condition = When(id=user_id, then=Value(score))
+        similarity_cases.append(condition)
+
+    #queryset
+    qs = FameUsers.objects.filter(id__in=user_ids)
+    qs = qs.annotate(
         similarity=Case(
-            *[When(id=uid, then=Value(sim)) for uid, sim in similarity_map.items()],
+            *similarity_cases,
             output_field=FloatField()
         )
-    ).order_by('-similarity', '-date_joined')
+    )
+
+    qs = qs.order_by('-similarity', '-date_joined')
     return qs
 
